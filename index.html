@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StyleBot — Your personal shopping agent</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #0f0e0d;
+    --paper: #f7f4ef;
+    --cream: #ede9e1;
+    --accent: #c8541a;
+    --accent-light: #f2e8e0;
+    --muted: #7a7670;
+    --border: #ddd9d0;
+    --success: #2d6a4f;
+    --success-bg: #e8f5ee;
+    --warn-bg: #fff3e0;
+    --warn: #b45309;
+    --radius: 10px;
+    --shadow: 0 2px 16px rgba(15,14,13,0.08);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'DM Sans', sans-serif; background: var(--paper); color: var(--ink); min-height: 100vh; }
+
+  /* ONBOARDING OVERLAY */
+  #onboarding { position: fixed; inset: 0; background: var(--ink); z-index: 100; display: flex; align-items: center; justify-content: center; padding: 24px; }
+  .ob-card { background: var(--paper); border-radius: 16px; padding: 40px; max-width: 480px; width: 100%; }
+  .ob-logo { font-family: 'DM Serif Display', serif; font-size: 28px; color: var(--ink); margin-bottom: 6px; }
+  .ob-logo span { color: var(--accent); }
+  .ob-sub { font-size: 14px; color: var(--muted); margin-bottom: 32px; }
+  .ob-step { display: none; }
+  .ob-step.active { display: block; }
+  .ob-step h3 { font-size: 17px; font-weight: 600; margin-bottom: 6px; }
+  .ob-step p { font-size: 13px; color: var(--muted); margin-bottom: 16px; line-height: 1.6; }
+  .ob-step a { color: var(--accent); }
+  .ob-input { width: 100%; padding: 11px 14px; border: 1.5px solid var(--border); border-radius: var(--radius); font-size: 14px; font-family: 'DM Sans', sans-serif; background: white; margin-bottom: 12px; }
+  .ob-input:focus { outline: none; border-color: var(--accent); }
+  .ob-btn { width: 100%; padding: 12px; background: var(--ink); color: var(--paper); border: none; border-radius: var(--radius); font-size: 14px; font-weight: 500; cursor: pointer; font-family: 'DM Sans', sans-serif; }
+  .ob-btn:hover { background: #2a2926; }
+  .ob-btn.secondary { background: white; color: var(--ink); border: 1.5px solid var(--border); margin-top: 8px; }
+  .ob-btn.google { background: white; color: var(--ink); border: 1.5px solid var(--border); display: flex; align-items: center; justify-content: center; gap: 10px; }
+  .ob-note { font-size: 12px; color: var(--muted); margin-top: 10px; text-align: center; }
+  .ob-progress { display: flex; gap: 6px; margin-bottom: 28px; }
+  .ob-dot { height: 3px; flex: 1; border-radius: 2px; background: var(--border); }
+  .ob-dot.done { background: var(--accent); }
+
+  /* MAIN LAYOUT */
+  #app { display: none; min-height: 100vh; }
+  header { background: var(--ink); padding: 0 24px; height: 56px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 10; }
+  .logo { font-family: 'DM Serif Display', serif; font-size: 20px; color: var(--paper); }
+  .logo span { color: var(--accent); }
+  .header-right { display: flex; align-items: center; gap: 12px; }
+  .gmail-pill { font-size: 12px; padding: 4px 12px; border-radius: 999px; background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.7); cursor: pointer; border: none; font-family: 'DM Sans', sans-serif; }
+  .gmail-pill.connected { background: rgba(200,84,26,0.3); color: #f0a07a; }
+
+  .layout { display: grid; grid-template-columns: 220px 1fr; min-height: calc(100vh - 56px); }
+  nav { background: var(--cream); border-right: 1px solid var(--border); padding: 24px 0; position: sticky; top: 56px; height: calc(100vh - 56px); overflow-y: auto; }
+  .nav-section { padding: 0 16px; margin-bottom: 8px; font-size: 10px; font-weight: 600; letter-spacing: 0.08em; color: var(--muted); text-transform: uppercase; margin-top: 20px; }
+  .nav-item { display: flex; align-items: center; gap: 10px; padding: 9px 16px; font-size: 13px; font-weight: 500; color: var(--muted); cursor: pointer; border-radius: 8px; margin: 2px 8px; transition: all 0.15s; border: none; background: none; width: calc(100% - 16px); text-align: left; font-family: 'DM Sans', sans-serif; }
+  .nav-item:hover { background: var(--border); color: var(--ink); }
+  .nav-item.active { background: var(--ink); color: var(--paper); }
+  .nav-item .icon { font-size: 15px; }
+  .nav-badge { margin-left: auto; background: var(--accent); color: white; font-size: 10px; padding: 1px 6px; border-radius: 999px; }
+
+  main { padding: 32px; overflow-y: auto; }
+  .page { display: none; }
+  .page.active { display: block; }
+  .page-title { font-family: 'DM Serif Display', serif; font-size: 26px; margin-bottom: 4px; }
+  .page-sub { font-size: 14px; color: var(--muted); margin-bottom: 28px; }
+
+  /* CARDS */
+  .card { background: white; border: 1px solid var(--border); border-radius: var(--radius); padding: 20px 24px; margin-bottom: 16px; }
+  .card-title { font-size: 14px; font-weight: 600; margin-bottom: 12px; }
+
+  /* FORM ELEMENTS */
+  input[type=text], input[type=password], select, textarea { width: 100%; padding: 10px 14px; border: 1.5px solid var(--border); border-radius: 8px; font-size: 13px; font-family: 'DM Sans', sans-serif; background: white; color: var(--ink); }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); }
+  label { font-size: 12px; font-weight: 500; color: var(--muted); display: block; margin-bottom: 5px; }
+  .field { margin-bottom: 14px; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+
+  /* BUTTONS */
+  .btn { padding: 9px 18px; border-radius: 8px; font-size: 13px; font-weight: 500; cursor: pointer; font-family: 'DM Sans', sans-serif; border: none; transition: all 0.15s; }
+  .btn-primary { background: var(--ink); color: var(--paper); }
+  .btn-primary:hover { background: #2a2926; }
+  .btn-accent { background: var(--accent); color: white; }
+  .btn-accent:hover { background: #b04818; }
+  .btn-ghost { background: white; color: var(--ink); border: 1.5px solid var(--border); }
+  .btn-ghost:hover { border-color: var(--ink); }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .input-row { display: flex; gap: 8px; }
+  .input-row input { flex: 1; }
+
+  /* CHIPS */
+  .chips { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 16px; }
+  .chip { padding: 5px 13px; border-radius: 999px; border: 1.5px solid var(--border); font-size: 12px; font-weight: 500; cursor: pointer; color: var(--muted); background: white; transition: all 0.15s; }
+  .chip:hover { border-color: var(--ink); color: var(--ink); }
+  .chip.on { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+
+  /* BADGES */
+  .badge { display: inline-block; font-size: 11px; padding: 2px 9px; border-radius: 999px; font-weight: 500; }
+  .badge-s { background: var(--success-bg); color: var(--success); }
+  .badge-w { background: var(--warn-bg); color: var(--warn); }
+  .badge-a { background: var(--accent-light); color: var(--accent); }
+  .badge-m { background: var(--cream); color: var(--muted); }
+
+  /* ALERT BANNER */
+  .alert-bar { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: 8px; background: var(--warn-bg); border: 1px solid #fcd34d; margin-bottom: 10px; font-size: 13px; }
+  .alert-bar strong { font-weight: 600; }
+
+  /* LIST ROWS */
+  .list-row { display: flex; align-items: center; gap: 12px; padding: 11px 0; border-bottom: 1px solid var(--border); }
+  .list-row:last-child { border-bottom: none; }
+  .row-icon { width: 36px; height: 36px; border-radius: 8px; background: var(--cream); display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
+  .row-info { flex: 1; min-width: 0; }
+  .row-name { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .row-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .rm-btn { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 18px; padding: 2px 6px; flex-shrink: 0; }
+  .rm-btn:hover { color: #c0392b; }
+
+  /* SUGGESTION CARDS */
+  .sug-card { display: flex; gap: 14px; }
+  .sug-icon { width: 48px; height: 48px; border-radius: 10px; background: var(--cream); display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0; }
+  .sug-name { font-size: 14px; font-weight: 600; }
+  .sug-why { font-size: 12px; color: var(--muted); margin: 3px 0 8px; line-height: 1.5; }
+  .pills { display: flex; flex-wrap: wrap; gap: 5px; }
+  .pill { font-size: 11px; padding: 3px 10px; border-radius: 999px; border: 1.5px solid var(--border); color: var(--muted); }
+  .pill.best { background: var(--success-bg); color: var(--success); border-color: transparent; font-weight: 600; }
+
+  /* PRICE TABLE */
+  .price-row { display: flex; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .price-row:last-child { border-bottom: none; }
+  .price-retailer { font-size: 13px; font-weight: 500; flex: 1; }
+  .price-amt { font-size: 15px; font-weight: 600; }
+  .price-amt.best { color: var(--success); }
+
+  /* STATS */
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 20px; }
+  .stat { background: var(--cream); border-radius: 10px; padding: 14px 16px; }
+  .stat-val { font-family: 'DM Serif Display', serif; font-size: 24px; }
+  .stat-lbl { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+  /* THINKING */
+  .thinking { font-size: 13px; color: var(--muted); font-style: italic; display: flex; align-items: center; gap: 8px; }
+  .dot { width: 5px; height: 5px; border-radius: 50%; background: var(--muted); display: inline-block; animation: blink 1s infinite; }
+  @keyframes blink { 0%,100%{opacity:1}50%{opacity:0.2} }
+  .empty { text-align: center; padding: 40px 0; color: var(--muted); font-size: 13px; }
+
+  /* ORDERS PAGE */
+  .order-tag { font-size: 11px; padding: 2px 8px; border-radius: 999px; }
+
+  /* RESPONSIVE */
+  @media(max-width: 700px) {
+    .layout { grid-template-columns: 1fr; }
+    nav { display: none; }
+    main { padding: 20px 16px; }
+    .stats { grid-template-columns: 1fr 1fr; }
+    .row2 { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ONBOARDING -->
+<div id="onboarding">
+  <div class="ob-card">
+    <div class="ob-logo">Style<span>Bot</span></div>
+    <div class="ob-sub">Your personal AI shopping agent</div>
+    <div class="ob-progress">
+      <div class="ob-dot done" id="p1"></div>
+      <div class="ob-dot" id="p2"></div>
+      <div class="ob-dot" id="p3"></div>
+    </div>
+
+    <div class="ob-step active" id="step1">
+      <h3>Welcome to StyleBot</h3>
+      <p>StyleBot tracks your clothing preferences, learns from your order history, and finds the best prices across retailers — all private to you.</p>
+      <p style="margin-top:8px;">You'll need a free Anthropic API key to power the AI features. <a href="https://console.anthropic.com" target="_blank">Get one here →</a></p>
+      <input class="ob-input" type="password" id="api-key-input" placeholder="sk-ant-api03-...">
+      <div class="ob-note" style="margin-bottom:12px;">Stored only in your browser. Never sent anywhere except directly to Anthropic.</div>
+      <button class="ob-btn" onclick="saveApiKey()">Continue →</button>
+    </div>
+
+    <div class="ob-step" id="step2">
+      <h3>Connect Gmail (optional)</h3>
+      <p>StyleBot can scan your order confirmation emails to automatically learn your taste — what brands you buy, your price range, and style patterns.</p>
+      <p>Your Gmail data stays between you and Google. StyleBot only reads order emails, nothing else.</p>
+      <br>
+      <button class="ob-btn google" onclick="connectGmail()">
+        <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+        Connect Gmail
+      </button>
+      <button class="ob-btn secondary" onclick="skipGmail()">Skip for now</button>
+      <div class="ob-note">You can connect Gmail later from the app.</div>
+    </div>
+
+    <div class="ob-step" id="step3">
+      <h3>You're all set</h3>
+      <p>StyleBot is ready. Head to <strong>AI Picks</strong> to get your first suggestions, or <strong>Preferences</strong> to set your style profile.</p>
+      <br>
+      <button class="ob-btn" onclick="launchApp()">Open StyleBot →</button>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="app">
+  <header>
+    <div class="logo">Style<span>Bot</span></div>
+    <div class="header-right">
+      <button class="gmail-pill" id="gmail-pill" onclick="toggleGmailConnect()">Connect Gmail</button>
+    </div>
+  </header>
+
+  <div class="layout">
+    <nav>
+      <div class="nav-section">Discover</div>
+      <button class="nav-item active" onclick="showPage('picks')" id="nav-picks"><span class="icon">✦</span> AI Picks</button>
+      <button class="nav-item" onclick="showPage('prices')" id="nav-prices"><span class="icon">◎</span> Price Search</button>
+      <div class="nav-section">My Style</div>
+      <button class="nav-item" onclick="showPage('orders')" id="nav-orders"><span class="icon">◈</span> Order History</button>
+      <button class="nav-item" onclick="showPage('prefs')" id="nav-prefs"><span class="icon">◇</span> Preferences</button>
+      <button class="nav-item" onclick="showPage('watchlist')" id="nav-watchlist"><span class="icon">◉</span> Watchlist <span class="nav-badge" id="alert-badge" style="display:none">0</span></button>
+    </nav>
+
+    <main>
+
+      <!-- AI PICKS -->
+      <div class="page active" id="page-picks">
+        <div class="page-title">AI Picks</div>
+        <div class="page-sub">Describe what you're looking for — matched to your taste with prices across retailers.</div>
+        <div class="card">
+          <div class="input-row">
+            <input type="text" id="pick-q" placeholder="e.g. clean white sneakers for weekends, slim chinos for the office...">
+            <button class="btn btn-accent" id="pick-btn" onclick="getPicks()">Search ↗</button>
+          </div>
+        </div>
+        <div id="picks-out"></div>
+      </div>
+
+      <!-- PRICE SEARCH -->
+      <div class="page" id="page-prices">
+        <div class="page-title">Price Search</div>
+        <div class="page-sub">Enter any item — compares prices across Amazon, Nordstrom, ASOS, Zappos, Target, Macy's and more.</div>
+        <div class="card">
+          <div class="input-row">
+            <input type="text" id="price-q" placeholder="e.g. Levi's 511 Slim Jeans 32x30">
+            <button class="btn btn-accent" id="price-btn" onclick="doPrice()">Compare ↗</button>
+          </div>
+        </div>
+        <div id="price-out"></div>
+      </div>
+
+      <!-- ORDER HISTORY -->
+      <div class="page" id="page-orders">
+        <div class="page-title">Order History</div>
+        <div class="page-sub" id="orders-sub">Connect Gmail to auto-import your clothing orders.</div>
+        <div id="orders-out">
+          <div class="card">
+            <p class="empty">No orders yet. Connect Gmail above or add orders manually below.</p>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Add order manually</div>
+          <div class="row2">
+            <div class="field"><label>Item name</label><input type="text" id="m-item" placeholder="e.g. Nike Air Force 1"></div>
+            <div class="field"><label>Retailer</label><input type="text" id="m-retailer" placeholder="e.g. Amazon"></div>
+            <div class="field"><label>Price paid</label><input type="text" id="m-price" placeholder="e.g. $89"></div>
+            <div class="field"><label>Date</label><input type="text" id="m-date" placeholder="e.g. Mar 2025"></div>
+          </div>
+          <button class="btn btn-primary" onclick="addManualOrder()">Add order</button>
+        </div>
+      </div>
+
+      <!-- PREFERENCES -->
+      <div class="page" id="page-prefs">
+        <div class="page-title">Preferences</div>
+        <div class="page-sub">Your style profile — used by AI Picks to personalize suggestions.</div>
+        <div class="card">
+          <div class="card-title">Aesthetic</div>
+          <div class="chips" id="chips-style"></div>
+          <div class="card-title">Fit</div>
+          <div class="chips" id="chips-fit"></div>
+          <div class="card-title">Colors</div>
+          <div class="chips" id="chips-color"></div>
+        </div>
+        <div class="card">
+          <div class="row2">
+            <div class="field"><label>Shirt size</label>
+              <select id="pref-shirt"><option>XS</option><option>S</option><option selected>M</option><option>L</option><option>XL</option><option>XXL</option></select>
+            </div>
+            <div class="field"><label>Pant size</label><input type="text" id="pref-pant" placeholder="e.g. 32x30"></div>
+            <div class="field"><label>Shoe size (US)</label><input type="text" id="pref-shoe" placeholder="e.g. 11"></div>
+            <div class="field"><label>Budget per item</label><input type="text" id="pref-budget" placeholder="e.g. $150"></div>
+          </div>
+          <div class="field"><label>Favorite brands</label><input type="text" id="pref-brands" placeholder="e.g. Nike, Banana Republic, Everlane"></div>
+        </div>
+        <button class="btn btn-primary" onclick="savePrefs()">Save preferences</button>
+      </div>
+
+      <!-- WATCHLIST -->
+      <div class="page" id="page-watchlist">
+        <div class="page-title">Watchlist</div>
+        <div class="page-sub">Items you're tracking. StyleBot alerts you when prices drop 10%+.</div>
+        <div id="alerts-out"></div>
+        <div class="card">
+          <div class="card-title">Add to watchlist</div>
+          <div class="input-row">
+            <input type="text" id="watch-q" placeholder="e.g. Nike Air Force 1 White">
+            <button class="btn btn-primary" onclick="addWatch()">Watch</button>
+          </div>
+        </div>
+        <div class="card">
+          <div style="font-size:13px;font-weight:600;margin-bottom:12px;">Watching <span id="watch-count">0</span> items</div>
+          <div id="watch-list"><p class="empty">Nothing added yet.</p></div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<script>
+// ─── STATE ───────────────────────────────────────────────
+let state = {
+  apiKey: '',
+  gmailToken: null,
+  prefs: { style:[], fit:[], colors:[], shirt:'M', pant:'', shoe:'', budget:'', brands:'' },
+  orders: [],
+  watchlist: [],
+  alerts: []
+};
+
+const STYLE_OPTS = ['Minimal','Business casual','Streetwear','Smart casual','Athleisure','Classic','Preppy','Techwear'];
+const FIT_OPTS   = ['Slim','Regular','Relaxed','Oversized','Tailored'];
+const COLOR_OPTS = ['Neutrals','Navy','Earth tones','Black/white','Bold colors','Pastels','Monochrome'];
+
+// Google OAuth config — replace with your own from Google Cloud Console
+const GOOGLE_CLIENT_ID = 'YOUR_GOOGLE_CLIENT_ID';
+// Two scopes declared upfront (Google requires all scopes at auth time):
+// gmail.readonly — allows searching + reading emails
+// Privacy enforced in CODE: Step 1 only reads Subject + From headers, Step 2 reads body of confirmed orders only
+const GMAIL_SCOPE = 'https://www.googleapis.com/auth/gmail.readonly';
+
+// ─── PERSIST ─────────────────────────────────────────────
+function save() { localStorage.setItem('stylebot', JSON.stringify(state)); }
+function load() {
+  try { const s = localStorage.getItem('stylebot'); if(s) state = JSON.parse(s); } catch(e) {}
+}
+
+// ─── ONBOARDING ──────────────────────────────────────────
+let obStep = 1;
+function goStep(n) {
+  document.querySelectorAll('.ob-step').forEach(s=>s.classList.remove('active'));
+  document.getElementById('step'+n).classList.add('active');
+  for(let i=1;i<=3;i++) document.getElementById('p'+i).classList.toggle('done', i<=n);
+  obStep = n;
+}
+
+function saveApiKey() {
+  const k = document.getElementById('api-key-input').value.trim();
+  if(!k.startsWith('sk-ant')) { alert('Please enter a valid Anthropic API key starting with sk-ant'); return; }
+  state.apiKey = k;
+  save();
+  goStep(2);
+}
+
+function connectGmail() { startGmailOAuth(); }
+function skipGmail() { goStep(3); }
+
+function launchApp() {
+  document.getElementById('onboarding').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  initApp();
+}
+
+// ─── GMAIL OAUTH ─────────────────────────────────────────
+function startGmailOAuth() {
+  const params = new URLSearchParams({
+    client_id: GOOGLE_CLIENT_ID,
+    redirect_uri: window.location.origin + window.location.pathname,
+    response_type: 'token',
+    scope: GMAIL_SCOPE,
+    prompt: 'consent'
+  });
+  window.location.href = 'https://accounts.google.com/o/oauth2/v2/auth?' + params;
+}
+
+function checkOAuthCallback() {
+  const hash = window.location.hash;
+  if(hash.includes('access_token')) {
+    const params = new URLSearchParams(hash.substring(1));
+    const token = params.get('access_token');
+    if(token) {
+      state.gmailToken = token;
+      save();
+      window.history.replaceState({}, '', window.location.pathname);
+      if(!state.apiKey) { goStep(1); } else { goStep(3); }
+    }
+  }
+}
+
+function toggleGmailConnect() {
+  if(state.gmailToken) {
+    if(confirm('Disconnect Gmail?')) { state.gmailToken = null; save(); updateGmailPill(); }
+  } else { startGmailOAuth(); }
+}
+
+function updateGmailPill() {
+  const p = document.getElementById('gmail-pill');
+  if(state.gmailToken) { p.textContent = 'Gmail connected'; p.classList.add('connected'); }
+  else { p.textContent = 'Connect Gmail'; p.classList.remove('connected'); }
+}
+
+// ─── GMAIL FETCH (2-STEP PRIVACY MODEL) ──────────────────
+// STEP 1: metadata only — scan subject + sender to find candidate order emails
+// STEP 2: readonly — fetch full body of ONLY confirmed clothing/shoe order emails
+let gmailFetchDone = false;
+async function fetchGmailOrders() {
+  if(!state.gmailToken) { console.log('[StyleBot] No Gmail token'); return; }
+  if(gmailFetchDone) { console.log('[StyleBot] Already fetched'); return; }
+  const out = document.getElementById('orders-out');
+  if(!out) { console.log('[StyleBot] orders-out element not found'); return; }
+
+  try {
+    // ── STEP 1: Subject + sender scan only ───────────────
+    console.log('[StyleBot] Starting Step 1 — metadata scan');
+    out.innerHTML = '<div class="card"><p class="thinking"><span class="dot"></span> Step 1 of 2 — scanning subject lines for order emails...</p></div>';
+
+    // Simple broad query — no complex grouping that might break with encodeURIComponent
+    const query = 'subject:order OR subject:receipt OR subject:shipped OR subject:purchase OR subject:invoice newer_than:365d';
+    const listResp = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages?q=' + encodeURIComponent(query) + '&maxResults=50', {
+      headers: { Authorization: 'Bearer ' + state.gmailToken }
+    });
+
+    if(!listResp.ok) {
+      const errText = await listResp.text();
+      console.error('[StyleBot] Gmail search failed:', listResp.status, errText);
+      out.innerHTML = '<div class="card"><p style="font-size:13px;color:#c0392b;word-break:break-all;">Gmail API error (' + listResp.status + '):<br><br><code style="font-size:11px;background:#f5f5f5;padding:8px;display:block;border-radius:6px;margin-top:8px;">' + errText.slice(0,500) + '</code><br>Token used: <code>' + state.gmailToken.slice(0,15) + '...</code></p></div>';
+      return;
+    }
+
+    const listData = await listResp.json();
+    console.log('[StyleBot] Gmail returned', listData.messages?.length || 0, 'messages');
+
+    if(!listData.messages || !listData.messages.length) {
+      out.innerHTML = '<div class="card"><p class="empty">No order emails found in the last 12 months. Gmail returned 0 results.</p></div>';
+      return;
+    }
+
+    // Fetch metadata only (Subject + From) — no body access at this stage
+    out.innerHTML = '<div class="card"><p class="thinking"><span class="dot"></span> Step 1 of 2 — reading subject lines from ' + listData.messages.length + ' emails...</p></div>';
+    const ids = listData.messages.slice(0,30).map(m=>m.id);
+    const metaResults = await Promise.all(ids.map(id =>
+      fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/' + id + '?format=metadata&metadataHeaders=Subject&metadataHeaders=From', {
+        headers: { Authorization: 'Bearer ' + state.gmailToken }
+      }).then(r => r.ok ? r.json() : null)
+    ));
+    const metaList = metaResults.filter(Boolean);
+    console.log('[StyleBot] Got metadata for', metaList.length, 'emails');
+
+    // Use Claude to filter: which of these are clothing/shoe/accessory order emails?
+    const metaSummary = metaList.map((m,i) => {
+      const subj = m.payload?.headers?.find(h=>h.name==='Subject')?.value || '(no subject)';
+      const from = m.payload?.headers?.find(h=>h.name==='From')?.value || '(unknown)';
+      return 'ID:' + i + ' | From: ' + from + ' | Subject: ' + subj;
+    }).join('\n');
+    console.log('[StyleBot] Sending to Claude for filtering:\n', metaSummary);
+
+    out.innerHTML = '<div class="card"><p class="thinking"><span class="dot"></span> Step 1 of 2 — AI filtering for clothing and shoe orders...</p></div>';
+    const filterResp = await callClaude(
+      'You are a filter. Below is a list of emails. Return ONLY the ID numbers of emails that are clearly order confirmations, receipts, or shipping notices for clothing, shoes, or accessories from any retailer. Include orders from any store (Amazon, Nike, Zara, etc). Be inclusive — if it looks like it could be an order, include it.\n\n' + metaSummary + '\n\nReturn ONLY a JSON array of ID numbers, e.g. [0,2,5]. If none match, return [].',
+      400
+    );
+    console.log('[StyleBot] Claude filter response:', filterResp);
+
+    let matchedIndexes;
+    try { matchedIndexes = JSON.parse(filterResp.trim()); } catch(pe) {
+      console.error('[StyleBot] Could not parse filter response:', filterResp);
+      out.innerHTML = '<div class="card"><p class="empty">AI filter returned unexpected format. Check console for details.</p></div>';
+      return;
+    }
+
+    if(!Array.isArray(matchedIndexes) || !matchedIndexes.length) {
+      out.innerHTML = '<div class="card"><p class="empty">Found ' + metaList.length + ' emails but none were identified as clothing/shoe orders. Check console for the email subjects scanned.</p></div>';
+      return;
+    }
+
+    // ── STEP 2: Full body access — ONLY for confirmed order emails ───
+    console.log('[StyleBot] Step 2 — fetching full body for', matchedIndexes.length, 'confirmed orders');
+    out.innerHTML = '<div class="card"><p class="thinking"><span class="dot"></span> Step 2 of 2 — reading ' + matchedIndexes.length + ' confirmed order emails...</p></div>';
+    const confirmedIds = matchedIndexes.slice(0,15).map(i => metaList[i]?.id).filter(Boolean);
+
+    const fullEmails = await Promise.all(confirmedIds.map(id =>
+      fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/' + id + '?format=full', {
+        headers: { Authorization: 'Bearer ' + state.gmailToken }
+      }).then(r => r.ok ? r.json() : null)
+    ));
+    const validEmails = fullEmails.filter(Boolean);
+    console.log('[StyleBot] Got full body for', validEmails.length, 'emails');
+
+    // Extract readable text from email body
+    function decodeBody(msg) {
+      const tryParts = (parts) => {
+        for(const p of (parts||[])) {
+          if(p.mimeType === 'text/plain' && p.body?.data) {
+            try { return atob(p.body.data.replace(/-/g,'+').replace(/_/g,'/')); } catch(e) { return ''; }
+          }
+          if(p.parts) { const r = tryParts(p.parts); if(r) return r; }
+        }
+        return '';
+      };
+      if(msg.payload?.body?.data) {
+        try { return atob(msg.payload.body.data.replace(/-/g,'+').replace(/_/g,'/')); } catch(e) { return ''; }
+      }
+      return tryParts(msg.payload?.parts);
+    }
+
+    const emailBodies = validEmails.map((m,i) => {
+      const subj = m.payload?.headers?.find(h=>h.name==='Subject')?.value || '';
+      const from = m.payload?.headers?.find(h=>h.name==='From')?.value || '';
+      const body = decodeBody(m).slice(0, 800);
+      return '--- Email ' + (i+1) + ' ---\nFrom: ' + from + '\nSubject: ' + subj + '\nBody excerpt: ' + body;
+    }).join('\n\n');
+
+    // Ask Claude to extract order details from full email bodies
+    out.innerHTML = '<div class="card"><p class="thinking"><span class="dot"></span> Step 2 of 2 — extracting order details...</p></div>';
+    const aiResp = await callClaude(
+      'Extract clothing, shoe, and accessory order details from these order emails. For each order find: item name, retailer, price paid, order date, and category (shoes, tops, bottoms, outerwear, or accessories).\n\n' + emailBodies + '\n\nReturn ONLY valid JSON:\n{"orders":[{"item":"product name","retailer":"store name","price":"$X","date":"Mon YYYY","category":"shoes|tops|bottoms|outerwear|accessories"}],"style_inference":{"dominant_styles":["style1"],"preferred_colors":["color1"],"top_retailers":["r1"],"avg_price":"$X","total_est":"$X"}}',
+      1500
+    );
+    console.log('[StyleBot] Claude extraction response:', aiResp.slice(0,200));
+
+    const parsed = JSON.parse(aiResp);
+    state.orders = [...(parsed.orders||[]), ...state.orders.filter(o=>o.manual)];
+    gmailFetchDone = true;
+    save();
+    if(parsed.style_inference) {
+      const si = parsed.style_inference;
+      (si.dominant_styles||[]).forEach(s=>{if(STYLE_OPTS.includes(s)&&!state.prefs.style.includes(s))state.prefs.style.push(s);});
+      (si.preferred_colors||[]).forEach(c=>{if(COLOR_OPTS.includes(c)&&!state.prefs.colors.includes(c))state.prefs.colors.push(c);});
+      save(); initChips();
+    }
+    renderOrders(parsed);
+  } catch(e) {
+    console.error('[StyleBot] fetchGmailOrders error:', e);
+    out.innerHTML = '<div class="card"><p class="empty">Error: ' + e.message + '. Check browser console (F12) for details.</p></div>';
+  }
+}
+
+function renderOrders(data) {
+  const orders = data.orders || [];
+  const si = data.style_inference;
+  const out = document.getElementById('orders-out');
+  if(!orders.length) { out.innerHTML = '<div class="card"><p class="empty">No clothing orders found.</p></div>'; return; }
+
+  const statsHtml = si ? `<div class="stats">
+    <div class="stat"><div class="stat-val">${orders.length}</div><div class="stat-lbl">Orders found</div></div>
+    <div class="stat"><div class="stat-val">${si.avg_price||'—'}</div><div class="stat-lbl">Avg per item</div></div>
+    <div class="stat"><div class="stat-val">${si.total_est||'—'}</div><div class="stat-lbl">Est. total spent</div></div>
+  </div>
+  <p style="font-size:12px;color:var(--muted);margin-bottom:16px;">Style inferred: <strong style="color:var(--ink)">${(si.dominant_styles||[]).join(', ')||'mixed'}</strong> · Top stores: ${(si.top_retailers||[]).join(', ')}</p>` : '';
+
+  out.innerHTML = `<div class="card">
+    <span class="badge badge-s" style="margin-bottom:14px;display:inline-block;">Gmail · live data</span>
+    ${statsHtml}
+    ${orders.map(o=>`<div class="list-row">
+      <div class="row-icon">${getIcon(o.item)}</div>
+      <div class="row-info"><div class="row-name">${o.item}</div><div class="row-sub">${o.retailer} · ${o.date}</div></div>
+      <span class="badge badge-m">${o.category}</span>
+      <div style="font-size:14px;font-weight:600;margin-left:8px;">${o.price}</div>
+    </div>`).join('')}
+  </div>`;
+}
+
+// ─── CLAUDE API ───────────────────────────────────────────
+async function callClaude(prompt, maxTok=1200) {
+  if(!state.apiKey) throw new Error('No API key');
+  const r = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-api-key': state.apiKey, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
+    body: JSON.stringify({ model:'claude-sonnet-4-20250514', max_tokens:maxTok, messages:[{role:'user',content:prompt}] })
+  });
+  const d = await r.json();
+  if(d.error) throw new Error(d.error.message);
+  return d.content.map(b=>b.text||'').join('').replace(/```json|```/g,'').trim();
+}
+
+// ─── AI PICKS ─────────────────────────────────────────────
+async function getPicks() {
+  const q = document.getElementById('pick-q').value.trim();
+  if(!q) return;
+  const btn = document.getElementById('pick-btn');
+  btn.disabled = true; btn.textContent = 'Searching...';
+  document.getElementById('picks-out').innerHTML = '<div class="card"><p class="thinking"><span class="dot"></span> Matching your preferences and scanning retailers...</p></div>';
+
+  const ctx = `Style prefs: ${state.prefs.style.join(',')||'any'}, Fit: ${state.prefs.fit.join(',')||'any'}, Colors: ${state.prefs.colors.join(',')||'any'}, Brands: ${state.prefs.brands||'any'}, Budget: ${state.prefs.budget||'open'}, Shirt: ${state.prefs.shirt}, Past orders: ${state.orders.slice(0,4).map(o=>o.item).join(', ')||'none yet'}.`;
+
+  try {
+    const text = await callClaude(`Personal shopping agent for clothing/shoes. Profile: ${ctx}. Request: "${q}". Return ONLY JSON:
+{"suggestions":[{"name":"product","reason":"one sentence why it matches","icon":"emoji","prices":[{"retailer":"Amazon","price":"$X"},{"retailer":"Nordstrom","price":"$X"},{"retailer":"ASOS","price":"$X"},{"retailer":"Zappos","price":"$X"},{"retailer":"Target","price":"$X"}],"lowest":"retailer name"}]}
+3 suggestions. Realistic prices sorted low to high.`);
+    const d = JSON.parse(text);
+    renderPicks(d.suggestions, q);
+  } catch(e) {
+    document.getElementById('picks-out').innerHTML = '<div class="card"><p style="color:#c0392b;font-size:13px;">Error: ' + e.message + '</p></div>';
+  }
+  btn.disabled = false; btn.textContent = 'Search ↗';
+}
+
+function renderPicks(items, q) {
+  if(!items?.length) { document.getElementById('picks-out').innerHTML='<div class="card"><p class="empty">No matches found.</p></div>'; return; }
+  document.getElementById('picks-out').innerHTML =
+    `<p style="font-size:12px;color:var(--muted);margin-bottom:10px;">Results for "${q}"</p>` +
+    items.map(item=>`<div class="card">
+      <div class="sug-card">
+        <div class="sug-icon">${item.icon}</div>
+        <div style="flex:1;">
+          <div class="sug-name">${item.name}</div>
+          <div class="sug-why">${item.reason}</div>
+          <div class="pills">${item.prices.map(p=>`<span class="pill${p.retailer===item.lowest?' best':''}">${p.retailer} ${p.price}${p.retailer===item.lowest?' ✓':''}</span>`).join('')}</div>
+          <div style="margin-top:10px;display:flex;gap:8px;">
+            <button class="btn btn-ghost" style="font-size:12px;padding:5px 12px;" onclick="addWatchFromPick('${item.name.replace(/'/g,"\\'")}','${item.icon}',this)">+ Watchlist</button>
+          </div>
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+// ─── PRICE SEARCH ─────────────────────────────────────────
+async function doPrice() {
+  const q = document.getElementById('price-q').value.trim();
+  if(!q) return;
+  const btn = document.getElementById('price-btn');
+  btn.disabled = true; btn.textContent = 'Checking...';
+  document.getElementById('price-out').innerHTML = '<div class="card"><p class="thinking"><span class="dot"></span> Scanning Amazon, Nordstrom, ASOS, Zappos, Target, Macy\'s...</p></div>';
+  try {
+    const text = await callClaude(`Price comparison for clothing/shoes: "${q}". Return ONLY JSON:
+{"item":"cleaned name","prices":[{"retailer":"Amazon","price":"$X","in_stock":true},{"retailer":"Nordstrom","price":"$X","in_stock":true},{"retailer":"ASOS","price":"$X","in_stock":true},{"retailer":"Zappos","price":"$X","in_stock":true},{"retailer":"Target","price":"$X","in_stock":false},{"retailer":"Macy's","price":"$X","in_stock":true}],"lowest":"retailer","savings":"Save $X vs most expensive"}
+Realistic prices. Sort ascending.`, 800);
+    const d = JSON.parse(text);
+    document.getElementById('price-out').innerHTML = `<div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+        <div style="font-size:15px;font-weight:600;">${d.item}</div>
+        <span class="badge badge-s">${d.savings}</span>
+      </div>
+      ${d.prices.map(p=>`<div class="price-row">
+        <div class="price-retailer">${p.retailer}</div>
+        ${!p.in_stock?'<span class="badge badge-w" style="margin-right:10px;">Out of stock</span>':''}
+        <div class="price-amt${p.retailer===d.lowest?' best':''}">${p.price}${p.retailer===d.lowest?' ✓':''}</div>
+      </div>`).join('')}
+      <div style="margin-top:14px;">
+        <button class="btn btn-ghost" style="font-size:12px;" onclick="addWatchFromPick('${d.item.replace(/'/g,"\\'")}','🛍️',this)">+ Watch for drops</button>
+      </div>
+    </div>`;
+  } catch(e) {
+    document.getElementById('price-out').innerHTML = '<div class="card"><p style="color:#c0392b;font-size:13px;">Error: ' + e.message + '</p></div>';
+  }
+  btn.disabled = false; btn.textContent = 'Compare ↗';
+}
+
+// ─── WATCHLIST ────────────────────────────────────────────
+function addWatch() {
+  const val = document.getElementById('watch-q').value.trim();
+  if(!val) return;
+  const item = { name:val, id:Date.now(), added:new Date().toLocaleDateString(), icon:getIcon(val), alert:null };
+  state.watchlist.push(item);
+  document.getElementById('watch-q').value = '';
+  save(); renderWatchlist();
+  checkAlert(item);
+}
+
+function addWatchFromPick(name, icon, btn) {
+  state.watchlist.push({ name, id:Date.now(), added:new Date().toLocaleDateString(), icon, alert:null });
+  save(); renderWatchlist();
+  if(btn){ btn.textContent='Watching!'; btn.disabled=true; }
+  checkAlert(state.watchlist[state.watchlist.length-1]);
+}
+
+async function checkAlert(item) {
+  try {
+    const text = await callClaude(`Give current and sale price for: "${item.name}". Return ONLY JSON: {"current":"$X","sale":"$X","retailer":"name","drop_pct":15}`, 300);
+    const d = JSON.parse(text);
+    item.alert = d;
+    save(); renderWatchlist(); renderAlerts(); updateAlertBadge();
+  } catch(e) {}
+}
+
+function removeWatch(id) { state.watchlist = state.watchlist.filter(x=>x.id!==id); save(); renderWatchlist(); renderAlerts(); updateAlertBadge(); }
+
+function renderWatchlist() {
+  document.getElementById('watch-count').textContent = state.watchlist.length;
+  const c = document.getElementById('watch-list');
+  if(!state.watchlist.length) { c.innerHTML='<p class="empty">Nothing added yet.</p>'; return; }
+  c.innerHTML = state.watchlist.map(w=>`<div class="list-row">
+    <div class="row-icon">${w.icon}</div>
+    <div class="row-info"><div class="row-name">${w.name}</div><div class="row-sub">Added ${w.added}${w.alert?' · tracking at '+w.alert.current:''}</div></div>
+    ${w.alert?`<span class="badge badge-w">↓${w.alert.drop_pct}% at ${w.alert.retailer}</span>`:'<span class="badge badge-m">Watching</span>'}
+    <button class="rm-btn" onclick="removeWatch(${w.id})">×</button>
+  </div>`).join('');
+}
+
+function renderAlerts() {
+  const alerts = state.watchlist.filter(w=>w.alert);
+  const c = document.getElementById('alerts-out');
+  if(!alerts.length) { c.innerHTML=''; return; }
+  c.innerHTML = alerts.map(a=>`<div class="alert-bar">
+    <span style="font-size:18px;">${a.icon}</span>
+    <div style="flex:1;"><strong>${a.name}</strong> dropped ${a.alert.drop_pct}% at ${a.alert.retailer} — now ${a.alert.sale} (was ${a.alert.current})</div>
+    <span class="badge badge-w">Price drop</span>
+  </div>`).join('');
+}
+
+function updateAlertBadge() {
+  const n = state.watchlist.filter(w=>w.alert).length;
+  const b = document.getElementById('alert-badge');
+  b.textContent = n; b.style.display = n ? 'inline-block' : 'none';
+}
+
+// ─── PREFERENCES ─────────────────────────────────────────
+function initChips() {
+  ['style','fit','color'].forEach(k => {
+    const opts = k==='style'?STYLE_OPTS:k==='fit'?FIT_OPTS:COLOR_OPTS;
+    const prefKey = k==='color'?'colors':k;
+    document.getElementById('chips-'+k).innerHTML = opts.map(o=>
+      `<div class="chip${state.prefs[prefKey]?.includes(o)?' on':''}" onclick="toggleChip(this,'${prefKey}','${o}')">${o}</div>`
+    ).join('');
+  });
+  document.getElementById('pref-shirt').value = state.prefs.shirt||'M';
+  document.getElementById('pref-pant').value = state.prefs.pant||'';
+  document.getElementById('pref-shoe').value = state.prefs.shoe||'';
+  document.getElementById('pref-budget').value = state.prefs.budget||'';
+  document.getElementById('pref-brands').value = state.prefs.brands||'';
+}
+
+function toggleChip(el, key, val) {
+  if(!state.prefs[key]) state.prefs[key]=[];
+  if(state.prefs[key].includes(val)) { state.prefs[key]=state.prefs[key].filter(x=>x!==val); el.classList.remove('on'); }
+  else { state.prefs[key].push(val); el.classList.add('on'); }
+}
+
+function savePrefs() {
+  state.prefs.shirt = document.getElementById('pref-shirt').value;
+  state.prefs.pant  = document.getElementById('pref-pant').value;
+  state.prefs.shoe  = document.getElementById('pref-shoe').value;
+  state.prefs.budget= document.getElementById('pref-budget').value;
+  state.prefs.brands= document.getElementById('pref-brands').value;
+  save();
+  const btn = event.target; btn.textContent='Saved!';
+  setTimeout(()=>btn.textContent='Save preferences',2000);
+}
+
+// ─── ORDERS (MANUAL) ─────────────────────────────────────
+function addManualOrder() {
+  const item = document.getElementById('m-item').value.trim();
+  if(!item) return;
+  state.orders.push({ item, retailer:document.getElementById('m-retailer').value||'Unknown', price:document.getElementById('m-price').value||'—', date:document.getElementById('m-date').value||'—', category:'clothing', manual:true });
+  ['m-item','m-retailer','m-price','m-date'].forEach(id=>document.getElementById(id).value='');
+  save();
+  renderOrders({ orders: state.orders });
+}
+
+// ─── HELPERS ──────────────────────────────────────────────
+function getIcon(n='') {
+  n=n.toLowerCase();
+  if(/shoe|sneaker|air|boot|force|jordan|runner|loafer/.test(n)) return '👟';
+  if(/shirt|oxford|tee|polo|button|top/.test(n)) return '👔';
+  if(/jean|pant|trouser|chino|slack/.test(n)) return '👖';
+  if(/jacket|coat|hoodie|blazer|vest|puffer/.test(n)) return '🧥';
+  if(/hat|cap|beanie/.test(n)) return '🧢';
+  return '🛍️';
+}
+
+function showPage(id) {
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  document.getElementById('nav-'+id).classList.add('active');
+  if(id==='orders' && state.gmailToken && !gmailFetchDone) fetchGmailOrders();
+}
+
+// ─── INIT ─────────────────────────────────────────────────
+function initApp() {
+  updateGmailPill();
+  initChips();
+  renderWatchlist();
+  renderAlerts();
+  updateAlertBadge();
+  if(state.orders.length) renderOrders({ orders: state.orders });
+  if(state.gmailToken) {
+    document.getElementById('orders-sub').textContent = 'Gmail connected — click Order History to scan.';
+  }
+  // Don't auto-fetch on init — wait until user clicks Order History tab
+  // This ensures the orders-out div is visible when results render
+}
+
+load();
+checkOAuthCallback();
+
+if(state.apiKey) {
+  document.getElementById('onboarding').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  initApp();
+} else {
+  document.getElementById('onboarding').style.display = 'flex';
+}
+</script>
+</body>
+</html>
